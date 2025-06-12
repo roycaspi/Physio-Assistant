@@ -3,8 +3,8 @@ from transformers import pipeline
 import base64
 import io
 import openai
-from pydub import AudioSegment
-from pydub.utils import which
+# from pydub import AudioSegment
+# from pydub.utils import which
 from flask_cors import CORS
 import wave
 import os
