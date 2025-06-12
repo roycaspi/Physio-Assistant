@@ -1,43 +1,44 @@
 from flask import Flask, request, jsonify
-from transformers import pipeline
 import base64
 import io
 import openai
-# from pydub import AudioSegment
-# from pydub.utils import which
 from flask_cors import CORS
-import wave
 import os
-import numpy as np
 from dotenv import load_dotenv
+
+# Load environment variables from .env file
 load_dotenv()
 
-
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-client = openai.OpenAI(api_key=OPENAI_API_KEY)
+# Initialize OpenAI client
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app)  # Enable CORS so your React Native app can access it
+CORS(app)  # Enable CORS for all domains
 
 
 @app.route("/transcribe", methods=["POST"])
 def transcribe():
     try:
         data = request.get_json()
+
+        if not data or "fileData" not in data:
+            return jsonify({"error": "Missing file data"}), 400
+
+        # Decode the audio file
         file_data = base64.b64decode(data["fileData"])
         file_name = data.get("fileName", "audio.m4a")
-
-        # Prepare file-like object
         audio_file = io.BytesIO(file_data)
-        audio_file.name = file_name
+        audio_file.name = file_name  # Required by OpenAI
 
-        result = client.audio.transcriptions.create(
+        # Call Whisper API
+        result = openai.Audio.transcribe(
             model="whisper-1",
             file=audio_file,
             language="he"
         )
-        return jsonify({"transcription": result.text})
+
+        return jsonify({"transcription": result["text"]})
 
     except Exception as e:
         print("Error:", str(e))
