@@ -1,0 +1,4 @@
+.env
+.venv/
+venv3.11/
+node_modules/
