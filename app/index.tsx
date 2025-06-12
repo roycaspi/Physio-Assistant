@@ -23,7 +23,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const WHISPER_API_URL = "http://10.100.102.11:5000/transcribe";
+const WHISPER_API_URL = "https://physio-whisper-backend.onrender.com/transcribe";
 
 async function transcribeWithWhisper(fileUri) {
   try {
