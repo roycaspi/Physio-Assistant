@@ -6,17 +6,18 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Platform } from "react-native";
 import { getFirestore, doc, setDoc, updateDoc, getDocs, collection, deleteDoc } from "firebase/firestore";
 import { initializeApp } from "firebase/app";
+import Constants from 'expo-constants';
 
 I18nManager.forceRTL(true);
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCPtbrpWCctsP43nYWsHOlxT4_agHhypZ8",
-  authDomain: "physio-assistant-1d077.firebaseapp.com",
-  projectId: "physio-assistant-1d077",
-  storageBucket: "physio-assistant-1d077.firebasestorage.app",
-  messagingSenderId: "726373746145",
-  appId: "1:726373746145:web:251b50801d93ab194efea0",
-  measurementId: "G-YFMVDH3T4E"
+  apiKey: Constants.expoConfig.extra.FIREBASE_API_KEY,
+  authDomain: Constants.expoConfig.extra.FIREBASE_AUTH_DOMAIN,
+  projectId: Constants.expoConfig.extra.FIREBASE_PROJECT_ID,
+  storageBucket: Constants.expoConfig.extra.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: Constants.expoConfig.extra.FIREBASE_MESSAGING_SENDER_ID,
+  appId: Constants.expoConfig.extra.FIREBASE_APP_ID,
+  measurementId: Constants.expoConfig.extra.FIREBASE_MEASUREMENT_ID
 };
 
 const app = initializeApp(firebaseConfig);
