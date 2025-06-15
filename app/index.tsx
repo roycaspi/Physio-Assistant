@@ -6,6 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Platform } from "react-native";
 import { getFirestore, doc, setDoc, updateDoc, getDocs, collection, deleteDoc } from "firebase/firestore";
 import { initializeApp } from "firebase/app";
+import { initializeFirestore, memoryLocalCache } from "firebase/firestore";
 import Constants from 'expo-constants';
 
 I18nManager.forceRTL(true);
@@ -21,9 +22,12 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// const db = getFirestore(app);
+const db = initializeFirestore(app, {
+  localCache: memoryLocalCache()
+});
 
-const WHISPER_API_URL = "https://physio-whisper-backend.onrender.com/transcribe";
+const WHISPER_API_URL = "https://physio-assistant.onrender.com/transcribe";
 
 async function transcribeWithWhisper(fileUri) {
   try {
@@ -40,11 +44,26 @@ async function transcribeWithWhisper(fileUri) {
       body: JSON.stringify({ fileName: "recording.m4a", fileData: fileBase64 }),
     });
 
-    const data = await response.json();
+    const text = await response.text(); 
+
+    
+    let data;
+    try {
+      console.log(text)
+      data = JSON.parse(text);
+    } catch (e) {
+      console.error("❌ JSON parsing failed. Server response:", text);
+      throw new Error("שגיאה: השרת החזיר תגובה לא תקפה");
+    }
+
+    if (data.error) {
+      throw new Error(data.details || "שגיאת תמלול");
+    }
+
     return data.transcription;
   } catch (error) {
-    console.error("שגיאה בתמלול:", error);
-    Alert.alert("שגיאה", "התמלול נכשל.");
+    console.error("שגיאה בתמלול:", error.message);
+    Alert.alert("שגיאה", error.message || "התמלול נכשל.");
     return "";
   }
 }
