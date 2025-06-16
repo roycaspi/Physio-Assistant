@@ -4,6 +4,7 @@ import tempfile
 import os
 from flask_cors import CORS
 import openai
+import openai
 from dotenv import load_dotenv
 
 load_dotenv()
