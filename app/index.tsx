@@ -1,12 +1,21 @@
 import React, { useState, useEffect, useRef } from "react";
 import { View, Text, TextInput, FlatList, ActivityIndicator, Alert, TouchableOpacity, I18nManager } from "react-native";
-import { Audio } from "expo-av";
+import { Audio } from "expo-audio";
 import * as FileSystem from "expo-file-system";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Platform } from "react-native";
-import { getFirestore, doc, setDoc, updateDoc, getDocs, collection, deleteDoc } from "firebase/firestore";
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  collection,
+  getDocs,
+  addDoc,
+} from "firebase/firestore";
 import { initializeApp } from "firebase/app";
-import { initializeFirestore, memoryLocalCache } from "firebase/firestore";
+import { initializeFirestore } from "firebase/firestore";
 import Constants from 'expo-constants';
 
 I18nManager.forceRTL(true);
@@ -18,14 +27,13 @@ const firebaseConfig = {
   storageBucket: Constants.expoConfig.extra.FIREBASE_STORAGE_BUCKET,
   messagingSenderId: Constants.expoConfig.extra.FIREBASE_MESSAGING_SENDER_ID,
   appId: Constants.expoConfig.extra.FIREBASE_APP_ID,
-  measurementId: Constants.expoConfig.extra.FIREBASE_MEASUREMENT_ID
+  measurementId: Constants.expoConfig.extra.FIREBASE_MEASUREMENT_ID,
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-// const db = getFirestore(app);
-const db = initializeFirestore(app, {
-  localCache: memoryLocalCache()
-});
+// Enable long polling for stability
+const db = initializeFirestore(app, { experimentalForceLongPolling: true });
 
 const WHISPER_API_URL = "https://physio-assistant.onrender.com/transcribe";
 
@@ -44,12 +52,9 @@ async function transcribeWithWhisper(fileUri) {
       body: JSON.stringify({ fileName: "recording.m4a", fileData: fileBase64 }),
     });
 
-    const text = await response.text(); 
-
-    
+    const text = await response.text();
     let data;
     try {
-      console.log(text)
       data = JSON.parse(text);
     } catch (e) {
       console.error("❌ JSON parsing failed. Server response:", text);
@@ -75,14 +80,17 @@ export default function App() {
   const [isRecording, setIsRecording] = useState(false);
   const recordingRef = useRef(null);
 
-  useEffect(() => {
-    const fetchAllPatientsNotes = async () => {
+  // Fetch all notes function
+  const fetchAllPatientsNotes = async () => {
+    try {
       const patientsSnapshot = await getDocs(collection(db, "patients"));
       const allNotes = [];
 
       for (const patientDoc of patientsSnapshot.docs) {
-        const meetingsRef = collection(db, "patients", patientDoc.id, "meetings");
-        const meetingsSnapshot = await getDocs(meetingsRef);
+        console.log("👤 Found patient:", patientDoc.id);
+        const meetingsSnapshot = await getDocs(
+          collection(db, "patients", patientDoc.id, "meetings")
+        );
         meetingsSnapshot.forEach(meeting => {
           allNotes.push({
             id: meeting.id,
@@ -92,22 +100,29 @@ export default function App() {
         });
       }
 
-      setNotes([...allNotes]);
-    };
+      console.log("✅ Collected notes:", allNotes);
+      setNotes(allNotes);
+    } catch (err) {
+      console.error("❌ Failed to fetch notes:", err);
+    }
+  };
 
+  useEffect(() => {
     fetchAllPatientsNotes();
   }, []);
 
+  // Save transcription and return new note
   const saveTranscriptToFirestore = async (patientName, transcript) => {
     const patientRef = doc(db, "patients", patientName);
     await setDoc(patientRef, { createdAt: new Date() }, { merge: true });
 
-    const noteRef = doc(collection(patientRef, "meetings"));
-    await setDoc(noteRef, {
+    const meetingsRef = collection(patientRef, "meetings");
+    const noteRef = await addDoc(meetingsRef, {
       timestamp: new Date(),
       transcript,
       edited: false,
     });
+    return noteRef.id;
   };
 
   const updateTranscriptInFirestore = async (patientName, noteId, newText) => {
@@ -135,8 +150,10 @@ export default function App() {
 
         setIsLoading(true);
         const transcription = await transcribeWithWhisper(uri);
-        await saveTranscriptToFirestore(patientName, transcription);
-setNotes(prev => [...prev]);
+        if (transcription) {
+          await saveTranscriptToFirestore(patientName, transcription);
+          await fetchAllPatientsNotes();
+        }
         setIsLoading(false);
       } else {
         const { granted } = await Audio.requestPermissionsAsync();
@@ -164,13 +181,13 @@ setNotes(prev => [...prev]);
   };
 
   const updateNote = (id, patient, newText) => {
-    updateTranscriptInFirestore(patient, id, newText);
-setNotes(prev => [...prev]);
+    updateTranscriptInFirestore(patient, id, newText)
+      .then(() => fetchAllPatientsNotes());
   };
 
   const deleteNote = (id, patient) => {
-    deleteNoteFromFirestore(patient, id);
-setNotes(prev => prev.filter(n => !(n.id === id && n.patient === patient)));
+    deleteNoteFromFirestore(patient, id)
+      .then(() => fetchAllPatientsNotes());
   };
 
   const groupedNotes = notes.reduce((acc, note) => {
@@ -209,9 +226,9 @@ setNotes(prev => prev.filter(n => !(n.id === id && n.patient === patient)));
 
       <FlatList
         data={Object.entries(groupedNotes).sort((a, b) => {
-          const lastA = a[1].reduce((latest, note) => latest.timestamp?.toDate() > note.timestamp?.toDate() ? latest : note);
-          const lastB = b[1].reduce((latest, note) => latest.timestamp?.toDate() > note.timestamp?.toDate() ? latest : note);
-          return lastB.timestamp?.toDate() - lastA.timestamp?.toDate();
+          const lastA = a[1].reduce((latest, note) => latest.timestamp.toDate() > note.timestamp.toDate() ? latest : note);
+          const lastB = b[1].reduce((latest, note) => latest.timestamp.toDate() > note.timestamp.toDate() ? latest : note);
+          return lastB.timestamp.toDate() - lastA.timestamp.toDate();
         })}
         keyExtractor={([patient]) => patient}
         contentContainerStyle={{ paddingBottom: 100 }}
@@ -221,10 +238,10 @@ setNotes(prev => prev.filter(n => !(n.id === id && n.patient === patient)));
             <View style={{ marginBottom: 30 }}>
               <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 10, textAlign: "right", color: "#2c3e50" }}>{patient}</Text>
               {patientNotes
-                .sort((a, b) => b.timestamp?.toDate() - a.timestamp?.toDate())
+                .sort((a, b) => b.timestamp.toDate() - a.timestamp.toDate())
                 .map(note => (
                   <View key={note.id} style={{ backgroundColor: "#ffffff", borderRadius: 10, padding: 15, marginBottom: 15, borderRightWidth: 5, borderRightColor: "#3498db" }}>
-                    <Text style={{ fontWeight: "bold", fontSize: 14, color: "#7f8c8d", textAlign: "right" }}>{note.timestamp?.toDate().toLocaleString()}</Text>
+                    <Text style={{ fontWeight: "bold", fontSize: 14, color: "#7f8c8d", textAlign: "right" }}>{note.timestamp.toDate().toLocaleString()}</Text>
                     <TextInput
                       multiline
                       defaultValue={note.transcript}
@@ -235,10 +252,7 @@ setNotes(prev => prev.filter(n => !(n.id === id && n.patient === patient)));
                           )
                         );
                       }}
-                      
-                      onEndEditing={(e) => {
-                        updateNote(note.id, patient, e.nativeEvent.text);
-                      }}
+                      onEndEditing={(e) => updateNote(note.id, patient, e.nativeEvent.text)}
                       style={{
                         fontSize: 16,
                         backgroundColor: "#f9f9f9",
