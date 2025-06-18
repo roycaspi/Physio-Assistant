@@ -25,4 +25,4 @@ COPY . .
 EXPOSE 5000
 
 # Run the app
-CMD ["python", "App.py"]
+CMD ["python", "backend/App.py"]
