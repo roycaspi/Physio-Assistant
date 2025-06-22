@@ -66,7 +66,7 @@ react {
 /**
  * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
  */
-def enableProguardInReleaseBuilds = (findProperty('android.enableProguardInReleaseBuilds') ?: false).toBoolean()
+def enableProguardInReleaseBuilds = (findProperty('android.enableProguardInReleaseBuilds') ?: true).toBoolean()
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -92,8 +92,13 @@ android {
         applicationId 'com.roycaspi.physioassistant'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        versionCode 15
         versionName "1.0.0"
+        missingDimensionStrategy 'react-native-gesture-handler', 'general'
+        missingDimensionStrategy 'react-native-reanimated', 'general'
+        missingDimensionStrategy 'react-native-safe-area-context', 'general'
+        missingDimensionStrategy 'react-native-screens', 'general'
+        missingDimensionStrategy 'react-native-webview', 'general'
     }
     signingConfigs {
         debug {
@@ -102,24 +107,30 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            if (project.hasProperty('MYAPP_UPLOAD_STORE_FILE')) {
+                storeFile file(MYAPP_UPLOAD_STORE_FILE)
+                storePassword MYAPP_UPLOAD_STORE_PASSWORD
+                keyAlias MYAPP_UPLOAD_KEY_ALIAS
+                keyPassword MYAPP_UPLOAD_KEY_PASSWORD
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
-            shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
-            minifyEnabled enableProguardInReleaseBuilds
+            signingConfig signingConfigs.release
+            shrinkResources true
+            minifyEnabled true
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
-            crunchPngs (findProperty('android.enablePngCrunchInReleaseBuilds')?.toBoolean() ?: true)
+            crunchPngs true
         }
     }
     packagingOptions {
         jniLibs {
-            useLegacyPackaging (findProperty('expo.useLegacyPackaging')?.toBoolean() ?: false)
+            useLegacyPackaging (findProperty('expo.useLegacyPackaging')?.toBoolean() ?: true)
         }
     }
     androidResources {
@@ -157,15 +168,15 @@ dependencies {
 
     if (isGifEnabled) {
         // For animated gif support
-        implementation("com.facebook.fresco:animated-gif:${expoLibs.versions.fresco.get()}")
+        implementation("com.facebook.fresco:animated-gif:3.0.0")
     }
 
     if (isWebpEnabled) {
         // For webp support
-        implementation("com.facebook.fresco:webpsupport:${expoLibs.versions.fresco.get()}")
+        implementation("com.facebook.fresco:webpsupport:3.0.0")
         if (isWebpAnimatedEnabled) {
             // Animated webp support
-            implementation("com.facebook.fresco:animated-webp:${expoLibs.versions.fresco.get()}")
+            implementation("com.facebook.fresco:animated-webp:3.0.0")
         }
     }
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { View, Text, TextInput, FlatList, ActivityIndicator, Alert, TouchableOpacity, I18nManager } from "react-native";
-import { Audio } from "expo-audio";
+import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Platform } from "react-native";
