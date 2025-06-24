@@ -20,65 +20,81 @@ import Constants from 'expo-constants';
 
 I18nManager.forceRTL(true);
 
+// Get Firebase config
 const firebaseConfig = {
-  apiKey: Constants.expoConfig.extra.FIREBASE_API_KEY,
-  authDomain: Constants.expoConfig.extra.FIREBASE_AUTH_DOMAIN,
-  projectId: Constants.expoConfig.extra.FIREBASE_PROJECT_ID,
-  storageBucket: Constants.expoConfig.extra.FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: Constants.expoConfig.extra.FIREBASE_MESSAGING_SENDER_ID,
-  appId: Constants.expoConfig.extra.FIREBASE_APP_ID,
-  measurementId: Constants.expoConfig.extra.FIREBASE_MEASUREMENT_ID,
+  apiKey: Constants.expoConfig?.extra?.FIREBASE_API_KEY,
+  authDomain: Constants.expoConfig?.extra?.FIREBASE_AUTH_DOMAIN,
+  projectId: Constants.expoConfig?.extra?.FIREBASE_PROJECT_ID,
+  storageBucket: Constants.expoConfig?.extra?.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: Constants.expoConfig?.extra?.FIREBASE_MESSAGING_SENDER_ID,
+  appId: Constants.expoConfig?.extra?.FIREBASE_APP_ID,
+  measurementId: Constants.expoConfig?.extra?.FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-// Enable long polling for stability
-const db = initializeFirestore(app, { experimentalForceLongPolling: true });
-
-const WHISPER_API_URL = "https://physio-assistant.onrender.com/transcribe";
-
-async function transcribeWithWhisper(fileUri) {
-  try {
-    const fileInfo = await FileSystem.getInfoAsync(fileUri);
-    if (!fileInfo.exists || fileInfo.size === 0) throw new Error("Invalid file");
-
-    const fileBase64 = await FileSystem.readAsStringAsync(fileUri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-
-    const response = await fetch(WHISPER_API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fileName: "recording.m4a", fileData: fileBase64 }),
-    });
-
-    const text = await response.text();
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      console.error("❌ JSON parsing failed. Server response:", text);
-      throw new Error("שגיאה: השרת החזיר תגובה לא תקפה");
-    }
-
-    if (data.error) {
-      throw new Error(data.details || "שגיאת תמלול");
-    }
-
-    return data.transcription;
-  } catch (error) {
-    console.error("שגיאה בתמלול:", error.message);
-    Alert.alert("שגיאה", error.message || "התמלול נכשל.");
-    return "";
-  }
-}
+const missingKeys = Object.entries(firebaseConfig)
+  .filter(([k, v]) => !v)
+  .map(([k]) => k);
 
 export default function App() {
+  if (missingKeys.length > 0) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" }}>
+        <Text style={{ color: "red", fontSize: 18, textAlign: "center" }}>
+          Missing Firebase config keys: {missingKeys.join(", ")}{"\n"}
+          Please check your .env and app.config.js!
+        </Text>
+      </View>
+    );
+  }
+
   const [patientName, setPatientName] = useState("");
   const [notes, setNotes] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const recordingRef = useRef(null);
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  // Enable long polling for stability
+  const db = initializeFirestore(app, { experimentalForceLongPolling: true });
+
+  const WHISPER_API_URL = "https://physio-assistant.onrender.com/transcribe";
+
+  async function transcribeWithWhisper(fileUri) {
+    try {
+      const fileInfo = await FileSystem.getInfoAsync(fileUri);
+      if (!fileInfo.exists || fileInfo.size === 0) throw new Error("Invalid file");
+
+      const fileBase64 = await FileSystem.readAsStringAsync(fileUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      const response = await fetch(WHISPER_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileName: "recording.m4a", fileData: fileBase64 }),
+      });
+
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error("❌ JSON parsing failed. Server response:", text);
+        throw new Error("שגיאה: השרת החזיר תגובה לא תקפה");
+      }
+
+      if (data.error) {
+        throw new Error(data.details || "שגיאת תמלול");
+      }
+
+      return data.transcription;
+    } catch (error) {
+      console.error("שגיאה בתמלול:", error.message);
+      Alert.alert("שגיאה", error.message || "התמלול נכשל.");
+      return "";
+    }
+  }
 
   // Fetch all notes function
   const fetchAllPatientsNotes = async () => {
