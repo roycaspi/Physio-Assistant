@@ -3,7 +3,7 @@ import base64
 import tempfile
 import os
 from flask_cors import CORS
-from openai import OpenAI
+import openai
 from dotenv import load_dotenv
 import requests
 import subprocess
@@ -13,19 +13,25 @@ from faster_whisper import WhisperModel
 load_dotenv()
 
 # Initialize OpenAI client for versions >=1.0
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # Load Ivrit.ai ASR model once at startup
 ivrit_asr = WhisperModel("ivrit-ai/whisper-large-v3-ct2", device="cpu", compute_type="int8", cpu_threads=4)
 
 def whisper_transcribe(audio_file_path):
     with open(audio_file_path, "rb") as audio_file:
-        result = client.audio.transcriptions.create(
-        model="whisper-1",
-        file=audio_file,
-        language="he",
-    )
-    return result.text
+        result = openai.Audio.transcribe(
+            "whisper-1",
+            audio_file,
+            language="he"
+        )
+    # Handle both dict and list return types for compatibility
+    if isinstance(result, dict):
+        return result.get("text", "")
+    elif isinstance(result, list) and len(result) > 0 and isinstance(result[0], dict):
+        return result[0].get("text", "")
+    else:
+        return str(result)
 
 def convert_audio_to_flac(input_path, output_path):
     """Convert audio file to FLAC format using ffmpeg"""
