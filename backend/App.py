@@ -7,16 +7,12 @@ import openai
 from dotenv import load_dotenv
 import requests
 import subprocess
-from faster_whisper import WhisperModel
 
 # Load environment variables from .env file
 load_dotenv()
 
 # Initialize OpenAI client for versions >=1.0
 openai.api_key = os.getenv("OPENAI_API_KEY")
-
-# Load Ivrit.ai ASR model once at startup
-ivrit_asr = WhisperModel("ivrit-ai/whisper-large-v3-ct2", device="cpu", compute_type="int8", cpu_threads=4)
 
 def whisper_transcribe(audio_file_path):
     with open(audio_file_path, "rb") as audio_file:
@@ -174,34 +170,3 @@ def transcribe():
     except Exception as e:
         print("Error:", str(e))
         return jsonify({"error": "Transcription failed", "details": str(e)}), 500
-
-@app.route('/transcribe_ivritai', methods=['POST'])
-def transcribe_ivritai():
-    try:
-        data = request.get_json()
-        audio_b64 = data.get('fileData')
-        if not audio_b64:
-            return jsonify({'error': 'No audio data provided'}), 400
-
-        # Save the audio to a temp file with proper permissions
-        temp_file = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-        try:
-            temp_file.write(base64.b64decode(audio_b64))
-            temp_file.close()
-            
-            # Transcribe using the ivrit-ai model
-            segments, info = ivrit_asr.transcribe(temp_file.name, language="he")
-            
-            # Combine all segments into one text
-            transcription_text = " ".join([segment.text for segment in segments])
-            
-            return jsonify({'transcription': transcription_text})
-        finally:
-            # Clean up the temporary file
-            try:
-                os.unlink(temp_file.name)
-            except:
-                pass
-    except Exception as e:
-        print(f"Ivrit.ai transcription error: {str(e)}")
-        return jsonify({'error': 'Ivrit.ai transcription failed', 'details': str(e)}), 500
