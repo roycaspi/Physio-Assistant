@@ -33,25 +33,32 @@ export default {
     },
     plugins: [
       "expo-router",
-      "expo-audio",
       ["expo-splash-screen", {
         image: "./assets/images/splash-icon.png",
         imageWidth: 200,
         resizeMode: "contain",
         backgroundColor: "#ffffff"
+      }],
+      ["expo-build-properties", {
+        android: {
+          reactNativeGradlePluginVersion: "0.74.5"
+        }
       }]
     ],
     experiments: {
       typedRoutes: true
     },
     extra: {
-      FIREBASE_API_KEY: process.env.FIREBASE_API_KEY,
-      FIREBASE_AUTH_DOMAIN: process.env.FIREBASE_AUTH_DOMAIN,
-      FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
-      FIREBASE_STORAGE_BUCKET: process.env.FIREBASE_STORAGE_BUCKET,
-      FIREBASE_MESSAGING_SENDER_ID: process.env.FIREBASE_MESSAGING_SENDER_ID,
-      FIREBASE_APP_ID: process.env.FIREBASE_APP_ID,
-      FIREBASE_MEASUREMENT_ID: process.env.FIREBASE_MEASUREMENT_ID,
+      FIREBASE_API_KEY: "AIzaSyCPtbrpWCctsP43nYWsHOlxT4_agHhypZ8",
+      FIREBASE_AUTH_DOMAIN: "physio-assistant-1d077.firebaseapp.com",
+      FIREBASE_PROJECT_ID: "physio-assistant-1d077",
+      FIREBASE_STORAGE_BUCKET: "physio-assistant-1d077.firebasestorage.app",
+      FIREBASE_MESSAGING_SENDER_ID: "726373746145",
+      FIREBASE_APP_ID: "1:726373746145:web:251b50801d93ab194efea0",
+      FIREBASE_MEASUREMENT_ID: "G-YFMVDH3T4E",
+      GOOGLE_EXPO_CLIENT_ID: "726373746145-go3brcqhc6b2g8dpmj868kjmfpksptv8.apps.googleusercontent.com",
+      GOOGLE_WEB_CLIENT_ID: "726373746145-go3brcqhc6b2g8dpmj868kjmfpksptv8.apps.googleusercontent.com",
+      GOOGLE_ANDROID_CLIENT_ID: "726373746145-bbgmenmgvbsuttgusvgs4aq7hbvc3sc4.apps.googleusercontent.com",
       eas: {
         projectId: "7538a68b-ca32-4605-ba53-ab46bbcf1470"
       }
