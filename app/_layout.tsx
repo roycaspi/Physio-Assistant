@@ -1,12 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
-import './firebase';
-import LoginScreen from './LoginScreen';
-import MainNavigator from './MainNavigator';
-import { ActivityIndicator, View, I18nManager } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
-import { Provider as PaperProvider } from 'react-native-paper';
 import * as Font from 'expo-font';
+import { Slot } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, I18nManager, Text, View } from 'react-native';
+import { Provider as PaperProvider } from 'react-native-paper';
 
 // Force RTL globally before anything else
 if (!I18nManager.isRTL) {
@@ -15,20 +11,32 @@ if (!I18nManager.isRTL) {
 }
 
 export default function RootLayout() {
-  const [user, setUser] = useState<User | null | undefined>(undefined); // undefined = loading, null = not logged in
   const [fontLoaded, setFontLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => setUser(firebaseUser));
-    // Load custom font
+    let didCancel = false;
+    console.log("Loading font...");
     Font.loadAsync({
       'SpaceMono': require('../assets/fonts/SpaceMono-Regular.ttf'),
-    }).then(() => setFontLoaded(true));
-    return unsubscribe;
+    })
+      .then(() => { 
+        console.log("Font loaded!");
+        if (!didCancel) setFontLoaded(true); 
+      })
+      .catch((err) => { 
+        console.log("Font load error:", err);
+        if (!didCancel) setError('שגיאת טעינת גופן: ' + err.message); 
+      });
+    return () => { didCancel = true; };
   }, []);
 
-  if (user === undefined || !fontLoaded) {
+  if (error) {
+    return (
+      <Text style={{ color: 'red', fontSize: 20, textAlign: 'center' }}>{error}</Text>
+    );
+  }
+  if (!fontLoaded) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" />
@@ -38,9 +46,7 @@ export default function RootLayout() {
 
   return (
     <PaperProvider>
-      <NavigationContainer>
-        {user ? <MainNavigator /> : <LoginScreen />}
-      </NavigationContainer>
+      <Slot />
     </PaperProvider>
   );
 } 

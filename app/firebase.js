@@ -1,7 +1,7 @@
-import { initializeApp, getApps } from 'firebase/app';
+import Constants from 'expo-constants';
+import { getApps, initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-import Constants from 'expo-constants';
 
 const firebaseConfig = {
   apiKey: Constants.expoConfig.extra.FIREBASE_API_KEY,
@@ -13,6 +13,8 @@ const firebaseConfig = {
   measurementId: Constants.expoConfig.extra.FIREBASE_MEASUREMENT_ID,
 };
 
+console.log("Firebase config at runtime:", firebaseConfig);
+
 let app;
 if (!getApps().length) {
   app = initializeApp(firebaseConfig);
@@ -20,4 +22,4 @@ if (!getApps().length) {
   app = getApps()[0];
 }
 
-export { app, getAuth, getFirestore }; 
+export { app, getAuth, getFirestore };

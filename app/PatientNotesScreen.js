@@ -1,14 +1,13 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { View, FlatList, Modal, StyleSheet, TextInput as RNTextInput, Pressable } from 'react-native';
-import { Appbar, Card, FAB, ActivityIndicator, Text, Button, Dialog, Portal, TextInput } from 'react-native-paper';
-import { getFirestore, doc, collection, getDocs, addDoc, serverTimestamp, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { Audio } from 'expo-av';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as FileSystem from 'expo-file-system';
-import { getAuth } from 'firebase/auth';
-import '../app/firebase';
 import { LinearGradient } from 'expo-linear-gradient';
+import { getAuth } from 'firebase/auth';
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, getFirestore, serverTimestamp, updateDoc } from 'firebase/firestore';
+import React, { useEffect, useRef, useState } from 'react';
+import { FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Appbar, Button, Card, Dialog, FAB, Portal, Text } from 'react-native-paper';
 import { WebView } from 'react-native-webview';
+import '../app/firebase';
 
 export default function PatientNotesScreen({ route, navigation }) {
   const { patientId, patientName } = route.params;
@@ -30,8 +29,6 @@ export default function PatientNotesScreen({ route, navigation }) {
   const [noteToDelete, setNoteToDelete] = useState(null);
   const [appendMode, setAppendMode] = useState(false);
   const [appendNoteId, setAppendNoteId] = useState(null);
-  const [editTranscriptTempVisible, setEditTranscriptTempVisible] = useState(false);
-  const [editTranscriptTempText, setEditTranscriptTempText] = useState('');
   const [transcriptionStatus, setTranscriptionStatus] = useState('');
   const [webviewTranscript, setWebviewTranscript] = useState('');
   const [baseTranscriptForAppend, setBaseTranscriptForAppend] = useState('');
@@ -39,11 +36,11 @@ export default function PatientNotesScreen({ route, navigation }) {
   const [webviewInitialValue, setWebviewInitialValue] = useState('');
   const [webviewInitialValueMain, setWebviewInitialValueMain] = useState('');
   const [pendingTranscript, setPendingTranscript] = useState('');
+  const [editTranscriptTitle, setEditTranscriptTitle] = useState('עריכת תמלול');
 
   const soundRef = useRef(null);
   const webviewRef = useRef(null);
   const webviewEditRef = useRef(null);
-  const webviewTempEditRef = useRef(null);
 
   useEffect(() => {
     fetchNotes();
@@ -181,7 +178,7 @@ export default function PatientNotesScreen({ route, navigation }) {
   };
 
   const transcribeRecording = async () => {
-    if (editTranscriptTempVisible || editTranscriptVisible) return;
+    if (editTranscriptVisible) return;
     setTranscriptionStatus('מזהה דיבור...');
     try {
       // 1. Get audio as base64
@@ -205,7 +202,7 @@ export default function PatientNotesScreen({ route, navigation }) {
         fileData = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
       }
       // 2. Try ivrit.ai
-      setTranscriptionStatus('מנסה תמלול עם ivrit.ai...');
+      setTranscriptionStatus('מתמלל...');
       try {
         const res = await fetch('https://physio-assistant.onrender.com/transcribe_ivritai', {
           method: 'POST',
@@ -217,19 +214,22 @@ export default function PatientNotesScreen({ route, navigation }) {
           setTranscriptionStatus('');
           if (appendMode) {
             const newTranscript = data.transcription.trim();
-            setNewTranscriptForAppend(newTranscript);
-            setEditTranscriptTempText(newTranscript);
+            const fullTranscript = (baseTranscriptForAppend && baseTranscriptForAppend.trim() ? baseTranscriptForAppend.trim() + '\n' : '') + newTranscript;
             setModalVisible(false);
-            setEditTranscriptTempVisible(true);
-            setWebviewInitialValue(data.transcription.trim());
+            setWebviewInitialValueMain(fullTranscript);
+            setEditTranscriptTitle('עריכת תמלול');
+            setCurrentNoteId(appendNoteId); // <-- Ensure correct note is set for editing
+            setEditTranscriptVisible(true);
             return;
           }
           const newTranscript = data.transcription.trim();
-          setPendingTranscript(newTranscript);
-          setEditTranscriptTempText(newTranscript);
+          const fullTranscript =
+            (transcript && transcript.trim() ? transcript.trim() + '\n' : '') + newTranscript;
           setModalVisible(false);
-          setEditTranscriptTempVisible(true);
-          setWebviewInitialValue(newTranscript);
+          setPendingTranscript(newTranscript);
+          setWebviewInitialValueMain(fullTranscript);
+          setEditTranscriptTitle('עריכת תמלול חדש');
+          setEditTranscriptVisible(true);
           return;
         } else if (res.ok && (!data.transcription || !data.transcription.trim())) {
           setTranscriptionStatus('לא זוהה תמלול. נסה שוב או נסה שירות אחר.');
@@ -238,7 +238,7 @@ export default function PatientNotesScreen({ route, navigation }) {
           throw new Error(data.error || 'ivrit.ai failed');
         }
       } catch (err) {
-        setTranscriptionStatus('ivrit.ai נכשל, מנסה Google...');
+        // setTranscriptionStatus('ivrit.ai נכשל, מנסה Google...');
       }
       // 3. Try Google
       try {
@@ -252,28 +252,31 @@ export default function PatientNotesScreen({ route, navigation }) {
           setTranscriptionStatus('');
           if (appendMode) {
             const newTranscript = data.transcription.trim();
-            setNewTranscriptForAppend(newTranscript);
-            setEditTranscriptTempText(newTranscript);
+            const fullTranscript = (baseTranscriptForAppend && baseTranscriptForAppend.trim() ? baseTranscriptForAppend.trim() + '\n' : '') + newTranscript;
             setModalVisible(false);
-            setEditTranscriptTempVisible(true);
-            setWebviewInitialValue(data.transcription.trim());
+            setWebviewInitialValueMain(fullTranscript);
+            setEditTranscriptTitle('עריכת תמלול');
+            setCurrentNoteId(appendNoteId); // <-- Ensure correct note is set for editing
+            setEditTranscriptVisible(true);
             return;
           }
           const newTranscript = data.transcription.trim();
-          setPendingTranscript(newTranscript);
-          setEditTranscriptTempText(newTranscript);
+          const fullTranscript =
+            (transcript && transcript.trim() ? transcript.trim() + '\n' : '') + newTranscript;
           setModalVisible(false);
-          setEditTranscriptTempVisible(true);
-          setWebviewInitialValue(newTranscript);
+          setPendingTranscript(newTranscript);
+          setWebviewInitialValueMain(fullTranscript);
+          setEditTranscriptTitle('עריכת תמלול חדש');
+          setEditTranscriptVisible(true);
           return;
         } else if (res.ok && (!data.transcription || !data.transcription.trim())) {
-          setTranscriptionStatus('לא זוהה תמלול. נסה שוב או נסה שירות אחר.');
+          // setTranscriptionStatus('לא זוהה תמלול. נסה שוב או נסה שירות אחר.');
           return;
         } else {
           throw new Error(data.error || 'Google STT failed');
         }
       } catch (err) {
-        setTranscriptionStatus('Google נכשל, מנסה Whisper...');
+        // setTranscriptionStatus('Google נכשל, מנסה Whisper...');
       }
       // 4. Try Whisper
       try {
@@ -287,19 +290,22 @@ export default function PatientNotesScreen({ route, navigation }) {
           setTranscriptionStatus('');
           if (appendMode) {
             const newTranscript = data.transcription.trim();
-            setNewTranscriptForAppend(newTranscript);
-            setEditTranscriptTempText(newTranscript);
+            const fullTranscript = (baseTranscriptForAppend && baseTranscriptForAppend.trim() ? baseTranscriptForAppend.trim() + '\n' : '') + newTranscript;
             setModalVisible(false);
-            setEditTranscriptTempVisible(true);
-            setWebviewInitialValue(data.transcription.trim());
+            setWebviewInitialValueMain(fullTranscript);
+            setEditTranscriptTitle('עריכת תמלול');
+            setCurrentNoteId(appendNoteId); // <-- Ensure correct note is set for editing
+            setEditTranscriptVisible(true);
             return;
           }
           const newTranscript = data.transcription.trim();
-          setPendingTranscript(newTranscript);
-          setEditTranscriptTempText(newTranscript);
+          const fullTranscript =
+            (transcript && transcript.trim() ? transcript.trim() + '\n' : '') + newTranscript;
           setModalVisible(false);
-          setEditTranscriptTempVisible(true);
-          setWebviewInitialValue(newTranscript);
+          setPendingTranscript(newTranscript);
+          setWebviewInitialValueMain(fullTranscript);
+          setEditTranscriptTitle('עריכת תמלול חדש');
+          setEditTranscriptVisible(true);
           return;
         } else if (res.ok && (!data.transcription || !data.transcription.trim())) {
           setTranscriptionStatus('לא זוהה תמלול. נסה שוב או נסה שירות אחר.');
@@ -392,10 +398,10 @@ export default function PatientNotesScreen({ route, navigation }) {
   };
 
   const handleEditTranscript = (noteId, currentText) => {
-    setEditTranscriptText(currentText || '');
+    setEditTranscriptTitle('עריכת תמלול');
+    setCurrentNoteId(noteId);
     setWebviewInitialValueMain(currentText || '');
     setEditTranscriptVisible(true);
-    setCurrentNoteId(noteId);
   };
 
   const saveTranscript = async (newTranscript) => {
@@ -423,40 +429,6 @@ export default function PatientNotesScreen({ route, navigation }) {
       console.error('שגיאה בשמירת תמלול:', err);
       alert('שגיאה בשמירת תמלול: ' + (err.message || err));
     }
-  };
-
-  // For editing transcript before upload (in modal)
-  const openEditTranscriptTemp = () => {
-    setWebviewInitialValue(transcript);
-    setEditTranscriptTempVisible(true);
-  };
-  const saveTranscriptTemp = (newValue) => {
-    if (appendMode) {
-      const combined = baseTranscriptForAppend && baseTranscriptForAppend.trim()
-        ? baseTranscriptForAppend.trim() + '\n' + newValue.trim()
-        : newValue.trim();
-      setTranscript(combined);
-      setEditTranscriptTempVisible(false);
-      setModalVisible(true);
-      setNewTranscriptForAppend('');
-    } else {
-      setTranscript(prev => {
-        const trimmedPrev = (prev || '').trim();
-        const trimmedNew = newValue.trim();
-        if (!trimmedPrev) return trimmedNew;
-        return trimmedPrev + '\n' + trimmedNew;
-      });
-      setPendingTranscript('');
-      setEditTranscriptTempVisible(false);
-      setModalVisible(true);
-    }
-  };
-
-  const handleAddRecordingToAppend = () => {
-    // Start a new recording in append mode, keep modal open
-    setIsRecording(true);
-    setRecordingModalVisible(true);
-    startRecording('append', appendNoteId);
   };
 
   return (
@@ -551,7 +523,7 @@ export default function PatientNotesScreen({ route, navigation }) {
               <Button onPress={uploadRecording} disabled={!recordedUris.length || uploading} style={{ alignSelf: 'flex-end', backgroundColor: '#7F7FD5' }} labelStyle={{ color: '#fff' }}>שמור הערה</Button>
               <Button onPress={() => setTranscript('')} disabled={uploading} style={{ alignSelf: 'flex-end', backgroundColor: '#fff', borderColor: '#7F7FD5', borderWidth: 1, marginBottom: 4 }} labelStyle={{ color: '#7F7FD5' }}>אפס תמלול</Button>
               {appendMode ? (
-                <Button onPress={handleAddRecordingToAppend} disabled={uploading} style={{ alignSelf: 'flex-end' }} labelStyle={{ color: '#7F7FD5' }}>הוסף הקלטה נוספת</Button>
+                <Button onPress={() => startRecording('append', appendNoteId)} disabled={uploading} style={{ alignSelf: 'flex-end' }} labelStyle={{ color: '#7F7FD5' }}>הוסף הקלטה נוספת</Button>
               ) : (
                 <Button onPress={handleAddNote} disabled={uploading} style={{ alignSelf: 'flex-end' }} labelStyle={{ color: '#7F7FD5' }}>הוסף הקלטה נוספת</Button>
               )}
@@ -560,7 +532,11 @@ export default function PatientNotesScreen({ route, navigation }) {
                 <Text style={{ color: '#7F7FD5', marginBottom: 8 }}>{transcriptionStatus}</Text>
               ) : null}
               {transcript ? (
-                <Pressable onPress={openEditTranscriptTemp}>
+                <Pressable onPress={() => {
+                  setWebviewInitialValueMain(transcript);
+                  setEditTranscriptTitle('עריכת תמלול');
+                  setEditTranscriptVisible(true);
+                }}>
                   <Text style={{ marginTop: 16, textAlign: 'right', textDecorationLine: 'underline', color: '#1976d2' }}>{transcript}</Text>
                 </Pressable>
               ) : null}
@@ -570,7 +546,22 @@ export default function PatientNotesScreen({ route, navigation }) {
         {/* Edit Transcript Dialogs */}
         <Portal>
           <Dialog visible={editTranscriptVisible} onDismiss={() => setEditTranscriptVisible(false)} style={{ direction: 'rtl', backgroundColor: 'transparent', shadowColor: '#7F7FD5', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 18, elevation: 12, borderRadius: 22 }}>
-            <Dialog.Title style={{ fontFamily: 'SpaceMono', textAlign: 'center', fontSize: 22, color: '#7F7FD5', fontWeight: 'bold', marginBottom: 0, textShadowColor: '#86A8E7', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 8, letterSpacing: 1.2 }}>
+            <Dialog.Title style={{
+              fontFamily: 'SpaceMono',
+              textAlign: 'center',
+              fontSize: 26,
+              color: '#fff',
+              fontWeight: 'bold',
+              marginBottom: 0,
+              backgroundColor: '#7F7FD5',
+              paddingVertical: 10,
+              borderRadius: 12,
+              textShadowColor: '#222',
+              textShadowOffset: { width: 0, height: 2 },
+              textShadowRadius: 8,
+              letterSpacing: 1.5,
+              overflow: 'hidden'
+            }}>
               עריכת תמלול
             </Dialog.Title>
             <Dialog.Content style={{ height: 220, backgroundColor: 'rgba(255,255,255,0.97)', borderRadius: 18, borderWidth: 2, borderColor: '#91EAE4', padding: 0, marginHorizontal: -16, marginTop: 8, marginBottom: 0, alignItems: 'stretch' }}>
@@ -604,42 +595,6 @@ export default function PatientNotesScreen({ route, navigation }) {
             </Dialog.Actions>
           </Dialog>
         </Portal>
-      <Portal>
-          <Dialog visible={editTranscriptTempVisible} onDismiss={() => setEditTranscriptTempVisible(false)} style={{ direction: 'rtl', backgroundColor: 'transparent', shadowColor: '#7F7FD5', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 18, elevation: 12, borderRadius: 22 }}>
-            <Dialog.Title style={{ fontFamily: 'SpaceMono', textAlign: 'center', fontSize: 22, color: '#7F7FD5', fontWeight: 'bold', marginBottom: 0, textShadowColor: '#86A8E7', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 8, letterSpacing: 1.2 }}>
-              עריכת תמלול
-            </Dialog.Title>
-            <Dialog.Content style={{ height: 220, backgroundColor: 'rgba(255,255,255,0.97)', borderRadius: 18, borderWidth: 2, borderColor: '#91EAE4', padding: 0, marginHorizontal: -16, marginTop: 8, marginBottom: 0, alignItems: 'stretch' }}>
-              <WebView
-                ref={webviewTempEditRef}
-                originWhitelist={['*']}
-                source={{ html: `<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'><style>body{margin:0;padding:0;background:transparent;}#editor{width:98%;height:96%;font-size:20px;line-height:1.7;font-family:'SpaceMono',sans-serif;padding:16px 12px 16px 12px;margin:1%;border-radius:14px;background:#f4f6fa;border:2px solid #91EAE4;box-shadow:0 4px 16px rgba(127,127,213,0.10);color:#222;box-sizing:border-box;outline:none;text-align:right;direction:rtl;overflow:auto;min-height:160px;max-height:200px;}</style></head><body><div id='editor' contenteditable='true' dir='rtl' spellcheck='false' placeholder='הזן תמלול...'>${webviewInitialValue.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</div><script>window.getTranscript = function() { window.ReactNativeWebView.postMessage(document.getElementById('editor').innerText); };</script></body></html>` }}
-                onMessage={event => saveTranscriptTemp(event.nativeEvent.data)}
-                javaScriptEnabled
-                style={{ flex: 1, backgroundColor: 'transparent', minHeight: 180, borderRadius: 14 }}
-                automaticallyAdjustContentInsets={false}
-            />
-          </Dialog.Content>
-            <Dialog.Actions style={{ justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 8 }}>
-              <Button
-                onPress={() => { setEditTranscriptTempVisible(false); setModalVisible(true); }}
-                mode="outlined"
-                style={{ borderColor: '#7F7FD5', borderRadius: 8, minWidth: 80, backgroundColor: 'white', elevation: 0 }}
-                labelStyle={{ color: '#7F7FD5', fontSize: 18, fontFamily: 'SpaceMono' }}
-              >ביטול</Button>
-              <Button
-                onPress={() => {
-                  if (webviewTempEditRef.current) {
-                    webviewTempEditRef.current.injectJavaScript('window.getTranscript();');
-                  }
-                }}
-                mode="contained"
-                style={{ backgroundColor: '#7F7FD5', borderRadius: 8, minWidth: 80, elevation: 2 }}
-                labelStyle={{ color: '#fff', fontSize: 18, fontFamily: 'SpaceMono' }}
-              >שמור</Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
       {/* Delete Note Dialog */}
       <Portal>
         <Dialog visible={deleteDialogVisible} onDismiss={() => setDeleteDialogVisible(false)} style={{ direction: 'rtl' }}>
